@@ -1,0 +1,45 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
+trigger:
+  - main
+  - release/*
+
+pool:
+  name: SuperBench CI
+  demands: cuda-agent
+  vmImage: ubuntu-latest
+
+container:
+  image: nvcr.io/nvidia/pytorch:24.03-py3
+  options: '--name cuda-ci -v /var/run/docker.sock:/var/run/docker.sock -v /usr/bin/docker:/usr/bin/docker:ro'
+
+steps:
+  - script: |
+      echo "##vso[task.prependpath]$HOME/.local/bin"
+    displayName: Export path
+  - script: |
+      docker exec -t -u root -e DEBIAN_FRONTEND=noninteractive cuda-ci bash -c \
+        "apt-get update -y -q && \
+        yes '' | apt-get install -y -q sudo && \
+        apt-get install -y -q \
+        ffmpeg libavcodec-dev libavformat-dev libavutil-dev libboost-program-options-dev libswresample-dev"
+      python3 -m pip install --upgrade pip setuptools==65.7
+      python3 -m pip install .[test,nvworker]
+      make postinstall
+    displayName: Install dependencies
+  - script: |
+      python3 setup.py lint
+    displayName: Run code lint
+  - script: |
+      SB_MICRO_PATH=$PWD make cppbuild
+    displayName: Build benchmarks
+  - script: |
+      SB_MICRO_PATH=$PWD python3 setup.py test
+    displayName: Run unit tests
+    timeoutInMinutes: 60
+  - script: |
+      bash <(curl -s https://codecov.io/bash) -cF cuda-unit-test
+    displayName: Report coverage results
+    env:
+      CODECOV_TOKEN: $(codecovToken)
