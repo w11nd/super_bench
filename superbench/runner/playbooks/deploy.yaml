@@ -37,6 +37,13 @@
         - /dev/kfd
         - /dev/dri
       register: amd_dev
+    - name: Checking Ascend 910 Environment
+      stat:
+        path: '{{ item }}'
+      with_items:
+        - /dev/davinci0
+        - /dev/davinci_manager
+      register: ascend_dev
     - name: Set GPU Facts
       set_fact:
         nvidia_gpu_exist: >-
@@ -45,11 +52,15 @@
         amd_gpu_exist: >-
           {{ amd_dev.results[0].stat.ischr is defined and amd_dev.results[0].stat.ischr and
           amd_dev.results[1].stat.isdir is defined and amd_dev.results[1].stat.isdir }}
+        ascend_gpu_exist: >-
+          {{ ascend_dev.results[0].stat.ischr is defined and ascend_dev.results[0].stat.ischr and
+          ascend_dev.results[1].stat.ischr is defined and ascend_dev.results[1].stat.ischr }}
     - name: Print GPU Checking Result
       debug:
         msg:
           - "NVIDIA GPU {{ 'detected' if nvidia_gpu_exist else 'not operational, pls confirm nvidia_uvm kernel module is loaded and /dev/nvidia-uvm exists' }}"
           - "AMD GPU {{ 'detected' if amd_gpu_exist else 'not operational, pls confirm amdgpu kernel module is loaded' }}"
+          - "Ascend 910 {{ 'detected' if ascend_gpu_exist else 'not operational, pls confirm Ascend drivers are properly installed' }}"
 
 - name: Remote Deployment
   hosts: all
@@ -101,6 +112,7 @@
           --privileged --net=host --ipc=host \
           {{ '--gpus=all' if nvidia_gpu_exist else '' }} \
           {{ '--security-opt seccomp=unconfined --group-add video --device=/dev/kfd --device=/dev/dri --cap-add=SYS_PTRACE --shm-size=16G' if amd_gpu_exist else '' }} \
+          {{ '--ASCEND_VISIBLE_DEVICES=0-7' if ascend_gpu_exist else '' }} \
           -w /root -v {{ workspace }}:/root -v /mnt:/mnt \
           -v /var/run/docker.sock:/var/run/docker.sock \
           --entrypoint /bin/bash {{ docker_image }} && \

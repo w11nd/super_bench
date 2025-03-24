@@ -494,9 +494,8 @@ class SuperBenchRunner():
                 ansible_rc = 0
                 if mode.name == 'local':
                     rc_list = Parallel(n_jobs=mode.proc_num if mode.parallel else 1)(
-                        delayed(self._run_proc)(benchmark_name, mode, {
-                            'proc_rank': proc_rank
-                        }) for proc_rank in range(mode.proc_num)
+                        delayed(self._run_proc)(benchmark_name, mode, {'proc_rank': proc_rank}) 
+                        for proc_rank in range(mode.proc_num)
                     )
                     ansible_rc = sum(rc_list)
                 elif mode.name == 'torch.distributed' or mode.name == 'mpi':
